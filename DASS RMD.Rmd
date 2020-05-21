@@ -1,0 +1,201 @@
+---
+title: "Stats 405 Final Project Analysis"
+output:
+  pdf_document: default
+  html_document: default
+---
+```{r include=FALSE}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(gtools)
+library(Jmisc)
+
+options(warn=-1)#warnings off
+#options(warn=) #warnings on
+#df <- read_excel(file.choose())
+setwd("C:/Users/Richard's Dell/Desktop/FINAL/405 final project")
+
+```
+This project shows assessment data for Dashboard Alternative Status Schools (DASS) that participated in the DASS Growth Data Pilot, a project facilitated by the Charter Schools Development Center. 
+
+The main question that I was interested in was whether or not these charter schools were effective in teaching students.  I wanted to measure this by looking at the distributions for each school and seeing how much of the students exhibited an increase in score from their initial test. 
+
+The first step towards my analysis was to find the increase (or decrease) in score between each test.  The sum of the differences were found to determine how much each student changed from their first and last test.  I also found the maximum increase for each student among all of the test recorded.  I then labeled each student based on whether the student improved at all between any of the tests(maximum) and all of the tests(sum).
+
+```{r include=FALSE}
+df = read.csv("Master2.csv", header = TRUE, stringsAsFactors = FALSE)
+
+#finding max of ge and scale scorers. Find dif in scores,  finding sum of differences, change in scores from beginning to end. Add to df. 
+df$max<-pmax(df$test0,df$test1,df$test2,df$test3,df$test4,na.rm=TRUE)-df$test0
+difference1<-df$test1-df$test0
+difference2<-df$test2-df$test1
+difference3<-df$test3-df$test2
+difference4<-df$test4-df$test3
+dif<-cbind(difference1,difference2,difference3,difference4)
+df<-cbind(df,difference1,difference2,difference3,difference4)
+sum<-rowSums(dif,na.rm=T)
+df<-cbind(df,sum)
+
+
+##get rid of 0s
+#df$sum[df$sum == 0] <- NA
+#df$max[df$max == 0] <- NA
+
+df$Split[df$max > 0] <- "1"
+df$Split[df$max <= 0] <- "0"
+
+df$End[df$sum > 0] <- "1"
+df$End[df$sum <= 0] <- "0"
+
+
+
+```
+
+
+I was interested in the average initial score, maximum difference, and difference between the first and last test.  I used an aggregate table to show this information below.  I also wanted to show the number of data points from each school.  It seems like only half of the students show an increase from the first and last test (sum), but will usually increase in roughly 1 grade level equivalency from their initial to highest test.
+```{r echo=FALSE}
+
+count = function(var){
+  # users of the function provide "variable" and this is what is done with it
+nrow(df[var,])
+}
+#summary stats
+aggregate(df[, c(3,18,23)], list(df$School2), mean,na.rm=TRUE)
+aggregate(df[, c(13)], list(df$School2), count)
+
+```
+
+
+Since I only included students that had at least two tests, I wanted to see the difference in frequencies between them.  There is a slight increase in mean when the student is given a second test.  This offers some evidence that charter schools are having a positive effect.
+```{r echo=FALSE}
+#Histogram: First vs Second test
+ggplot(data = df) + geom_histogram(aes(x = test0), alpha=0.3, fill ="blue",binwidth=1,position="dodge") +
+  geom_vline(aes(xintercept=mean(na.omit(test0))),color="blue",linetype="dashed",size=2) +
+  geom_histogram(aes(x = test1),alpha=0.3,, fill ="red",binwidth=1,position="dodge") +
+  geom_vline(aes(xintercept=mean(na.omit(test1))),color="red",linetype="dashed",size=2) +ggtitle("Histogram of Initial(Blue) and 1st test(Red)")+xlab("Frequency of First vs Second Test")
+
+```
+
+I decided to take a glimpse at some of the subgroup data.  Only three schools ended up properly submitting subgroup data so I decided not to delve too deep into it.  It's clear to see that the English Learners and Special Ed (EL and IEP) both have lower initial test scores but do as well or even better than non EL and IEP students.  There is some but not a noticeable difference between Free and Paid Lunch.  
+```{r echo=FALSE}
+
+#EL
+EL<-df[complete.cases(df$EL),]
+
+ggplot(EL,aes(x=EL,y=test0))+geom_boxplot()+geom_boxplot(outlier.shape=NA)+scale_y_continuous(limits = quantile(na.omit(EL$test0), c(0.1, 0.9)))+theme_bw()+
+  stat_summary(geom="text", fun.y=quantile,
+               fun.args=list(probs=c(.001,.25,.5,.75,.99)),
+               aes(label=sprintf("%1.1f", ..y..), color=factor(EL)),
+               position=position_nudge(x=.1,y=.2), size=3)+  theme(legend.position = "none") +ggtitle("EL")+ylab("Initial Test")
+ggplot(EL,aes(x=EL,y=max))+geom_boxplot()+geom_boxplot(outlier.shape=NA)+scale_y_continuous(limits = quantile(na.omit(EL$max), c(0.1, 0.9)))+theme_bw()+
+  stat_summary(geom="text", fun.y=quantile,
+               fun.args=list(probs=c(.001,.25,.5,.75,.99)),
+               aes(label=sprintf("%1.1f", ..y..), color=factor(EL)),
+               position=position_nudge(x=.1,y=.1), size=3)+  theme(legend.position = "none") +ggtitle("EL")+ylab("Test Difference: First to Highest")
+
+
+#IEP
+IEP<-df[complete.cases(df$IEP),]
+
+ggplot(IEP,aes(x=IEP,y=test0))+geom_boxplot()+geom_boxplot(outlier.shape=NA)+scale_y_continuous(limits = quantile(na.omit(IEP$test0), c(0.1, 0.9)))+theme_bw()+
+  stat_summary(geom="text", fun.y=quantile,
+               fun.args=list(probs=c(.001,.25,.5,.75,.99)),
+               aes(label=sprintf("%1.1f", ..y..), color=factor(IEP)),
+               position=position_nudge(x=.1,y=.2), size=3)+  theme(legend.position = "none") +ggtitle("IEP")+ylab("Initial Test")
+ggplot(IEP,aes(x=IEP,y=max))+geom_boxplot()+geom_boxplot(outlier.shape=NA)+scale_y_continuous(limits = quantile(na.omit(IEP$max), c(0.1, 0.9)))+theme_bw()+
+  stat_summary(geom="text", fun.y=quantile,
+               fun.args=list(probs=c(.001,.25,.5,.75,.99)),
+               aes(label=sprintf("%1.1f", ..y..), color=factor(IEP)),
+               position=position_nudge(x=.1,y=.1), size=3)+  theme(legend.position = "none") +ggtitle("IEP")+ylab("Test Difference: First to Highest")
+
+#Lunch
+Lunch<- subset(df,Lunch=="F" | Lunch=="P")
+
+ggplot(Lunch,aes(x=Lunch,y=test0))+geom_boxplot()+geom_boxplot(outlier.shape=NA)+scale_y_continuous(limits = quantile(na.omit(Lunch$test0), c(0.1, 0.9)))+theme_bw()+
+  stat_summary(geom="text", fun.y=quantile,
+               fun.args=list(probs=c(.001,.25,.5,.75,.99)),
+               aes(label=sprintf("%1.1f", ..y..), color=factor(Lunch)),
+               position=position_nudge(x=.1,y=.2), size=3)+  theme(legend.position = "none") +ggtitle("Lunch")+ylab("Initial Test")
+Lunch<- Lunch[complete.cases(Lunch$Lunch),]
+ggplot(Lunch,aes(x=Lunch,y=max))+geom_boxplot()+geom_boxplot(outlier.shape=NA)+scale_y_continuous(limits = quantile(na.omit(Lunch$max), c(0.1, 0.9)))+theme_bw()+
+  stat_summary(geom="text", fun.y=quantile,
+               fun.args=list(probs=c(.001,.25,.5,.75,.99)),
+               aes(label=sprintf("%1.1f", ..y..), color=factor(Lunch)),
+               position=position_nudge(x=.1,y=.1), size=3)+  theme(legend.position = "none") +ggtitle("Lunch")+ylab("Test Difference: First to Highest")
+
+```
+
+I wanted to highlight one school and compare it to the rest of the schools.  For this example, I chose school 4.  The scatter plots show both the maximum difference and total difference across all test.  School 4 is highlighted in red and represents a good sample of the given Charter School population since all of the data points are distributed evenly among the other schools.  
+```{r echo=FALSE}
+
+schoolid<-"4"
+df$Label[df$School2 == schoolid] <- "1"
+df$Label[df$School2 != schoolid] <- "0"
+
+ggplot(df,aes(x=test0, y=sum,color=Label))+ theme_bw()  +geom_point(size=1.1)  + xlab("Original Grade Level Equivalent Test Score") + geom_hline(yintercept = 0, linetype = "dashed", color="black",size=1) +ylab("Test Score Difference: First and Last")+ggtitle("School4 Vs All Other Schools - Math")+ scale_color_manual(name = "School", labels = c("Others", "School4"),values=c("gray70", "red1"))
+
+ggplot(df,aes(x=test0, y=max,color=Label))+ theme_bw()  +geom_point(size=1.1)  + xlab("Original Grade Level Equivalent Test Score") + geom_hline(yintercept = 0, linetype = "dashed", color="black",size=1) +ylab("Test Score Difference: First and Highest")+ggtitle("School4 Vs All Other Schools - Math")+ scale_color_manual(name = "School", labels = c("Others", "School4"),values=c("gray70", "red1"))
+
+```
+
+
+
+I decided to look at the schools across each grade equivalency.  The bulk of the students seem to be normally distributed.  Many of the students were high school charter schools and this is apparent because the slight increase in the 10th and 11th initial test score.  
+```{r echo=FALSE}
+#split bar graph, boxplot better
+g <- ggplot(df, aes(test0))
+g + geom_histogram(aes(fill=as.factor(School2)), 
+                   binwidth = 1, 
+                   col="black", 
+                   size=.1) +ggtitle("Original test score count")+xlab("First Test Score")
+```
+I could tell weird patterns in the data so I decided to remove some outliers:
+
+Removed students having a “bad day”
+Students that scored 5 GE levels lower than the previous test
+Students that scored lower than .5 GE score after the first test
+
+Removed students starting at grade equivalent test above 12th grade since these students were not likely to increase at all.
+
+After removing these points, I decided to see the distribution of data side by side using boxplots.  The blue line indicates the average for all schools and the red line indicates the average for the chosen school 4.  We can see from the graph that though school 4 started well below the overall average, the students eventually exhibited an increase in math test scores when measured from the initial to highest post test scores when compared to all of the other schools.  Though the increase is small, there is evidence that shows the charter school represented by group 4 has had a positive effect on the students.
+
+```{r echo=FALSE}
+schoolid<-"4"
+df$Label[df$School2 == schoolid] <- "1"
+df$Label[df$School2 != schoolid] <- "0"
+
+
+
+xd<-subset(df,difference1>-5 & test1>.5 & test0 < 13 )
+xd2<-subset(xd,difference2>-5 & test2>.5 | is.na(difference2))
+xd3<-subset(xd2,difference3>-5 & test3>.5 | is.na(difference3))
+xd4<-subset(xd3,difference4>-5 & test4>.5 | is.na(difference4))
+df<-xd4
+df<- df[order(df$test4,df$test3, df$test2,df$test1,df$test0,decreasing=TRUE, na.last=TRUE) ,]
+
+df$sum[df$sum == 0] <- NA
+df$max[df$max == 0] <- NA
+
+
+#first test boxplot
+ggplot(df,aes(x = reorder(School2,max , FUN = median),test0))+geom_boxplot(outlier.shape=NA)+
+  stat_summary(geom="text", fun.y=quantile,
+               fun.args=list(probs=c(0.001,.25,.5,.75,.999)),
+               aes(label=sprintf("%1.1f", ..y..), color=factor(School2)),
+               position=position_nudge(x=.01,y=.5), size=3)+theme_bw()+  xlab("School ID - 4") + ylab("Initial Grade Level Equivalent") +ggtitle("Initial Test Averages - Math")+  theme(legend.position = "none") + geom_hline(yintercept=mean(df$test0), linetype="dashed", color = "blue",size=.7)+ geom_hline(yintercept=mean(df[df$Label=="1","test0"],na.rm=TRUE), color = "red",size=.5)
+
+#max boxplot
+ggplot(df,aes(x = reorder(School2,max , FUN = median),max))+geom_boxplot(outlier.shape=NA)+theme_bw()+  xlab("School ID - 4") + ylab("GLE Growth - Initial to Highest") +ggtitle("Math Grade Level Growth - Initial to Highest Post-Test")+ theme(axis.text.x = element_blank()) +scale_y_continuous(limits = quantile(na.omit(df$max), c(0.1, 0.9)))+theme_bw()+
+  stat_summary(geom="text", fun.y=quantile,
+               fun.args=list(probs=c(.001,.25,.5,.75,.98)),
+               aes(label=sprintf("%1.1f", ..y..), color=factor(School2)),
+               position=position_nudge(x=.01,y=.1), size=3)+  theme(legend.position = "none") +geom_hline(yintercept=mean(na.omit(df$max)), linetype="dashed", color = "blue",size=.7)+geom_hline(yintercept=mean(df[df$Label=="1","max"],na.rm=TRUE), color = "red",size=.5)
+
+
+
+
+```
+
+
+
